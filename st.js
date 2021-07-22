@@ -1,625 +1,606 @@
-(function() {
-  var $context = this;
-  var root; // root context
-  var Helper = {
-    is_template: function(str) {
-      var re = /\{\{(.+)\}\}/g;
-      return re.test(str);
-    },
-    is_array: function(item) {
-      return (
-        Array.isArray(item) ||
-        (!!item &&
-          typeof item === 'object' && typeof item.length === 'number' &&
-          (item.length === 0 || (item.length > 0 && (item.length - 1) in item))
-        )
-      );
-    },
-    resolve: function(o, path, new_val) {
-      // 1. Takes any object
-      // 2. Finds subtree based on path
-      // 3. Sets the value to new_val
-      // 4. Returns the object;
-      if (path && path.length > 0) {
-        var func = Function('new_val', 'with(this) {this' + path + '=new_val; return this;}').bind(o);
-        return func(new_val);
-      } else {
-        o = new_val;
-        return o;
+(function () {
+  const $context = this;
+  let root; // root context
+
+  const _helper = {
+
+    /**
+     * 
+     * @param {String} s 
+     * @returns {Boolean}
+     */
+    isTemplate: (s) => {
+      if (debug) {
+        console.log('[_helper].isTemplate')
+        console.log('[_helper].isTemplate `param` :', s)
       }
+      const _reTagTemplate = /\{\{(.+)\}\}/g;
+      const _result = _reTagTemplate.test(s);
+      if (debug) { console.log('[_helper].isTemplate `return` :', _result) }
+      return _result
     },
+
+    /**
+     * A polyfil method to check wether the provided object is an array
+     * TODO: do we need this for compatibility ?
+     * @param {Any} v 
+     * @returns {Boolean}
+     */
+    isArrayPoly: (v) => {
+      if (debug) {
+        console.log('[_helper].isArrayPoly')
+        console.log('[_helper].isArrayPoly `param` :', v)
+      }
+      const _result = !!v &&
+        typeof v === 'object' &&
+        typeof v.length === 'number' &&
+        (
+          v.length === 0 ||
+          (
+            v.length > 0 &&
+            (v.length - 1) in v
+          )
+        );
+
+      if (debug) { console.log('[_helper].isArrayPoly `return` :', _result) }
+      return _result
+    },
+
+    /**
+     * A simple wrapper to check wether the type is an array.
+     * Tries to use built-in Array.isArray, falls back to a polyfil function isArrayPoly
+     * @param {*} v 
+     * @returns {Boolean}
+     */
+    isArray: (v) => {
+      // Using build-in Javascript check for arrays
+      // or polyfil version in case it is not available
+      if (debug) {
+        console.log('[_helper].isArray')
+        console.log('[_helper].isArray `param` :', v)
+      }
+      const _result = Array.isArray(v) || _helper.isArrayPoly(v);
+
+      if (debug) { console.log('[_helper].isArray `return` :', _result) }
+      return _result
+    },
+
+    /**
+     * Assign a new value to an object property using keypath
+     * Returns a new object
+     * @param {Object} obj  
+     * @param {String} path  
+     * @param {Any} nv 
+     * @returns {Object}
+     */
+    setPropByKeyPath: (obj = {}, path = '', nv) => {
+      if (path.length === 0) return nv;
+      const _setProp = new Function(['obj', 'nv'], `{ obj${path} = nv; return obj; }`);
+      const _result = _setProp(obj, nv);
+      return _result
+    },
+
+    /**
+     * Checks type of JSON property
+     * Returns a string 'object'|'array'|'string'
+     * @param {Any} v 
+     * @returns {String}
+     */
+    getJSONPropType: (v) => {
+      const _result = typeof v === 'string' ? 'string' :
+        Array.isArray(v) ? 'array' :
+          Object.prototype.toString.call(v) === '[object Object]' ? 'object' :
+            undefined;
+      return _result
+    },
+
   };
-  var Conditional = {
-    run: function(template, data) {
-      // expecting template as an array of objects,
-      // each of which contains '#if', '#elseif', 'else' as key
 
-      // item should be in the format of:
-      // {'#if item': 'blahblah'}
+  /**
+   * Handle conditional statements 
+   * 
+   */
+  const Conditional = {
 
-      // Step 1. get all the conditional keys of the template first.
-      // Step 2. then try evaluating one by one until something returns true
-      // Step 3. if it reaches the end, the last item shall be returned
-      for (var i = 0; i < template.length; i++) {
-        var item = template[i];
-        var keys = Object.keys(item);
-        // assuming that there's only a single kv pair for each item
-        var key = keys[0];
-        var func = TRANSFORM.tokenize(key);
-        if (func.name === '#if' || func.name === '#elseif') {
-          var expression = func.expression;
-          var res = TRANSFORM.fillout(data, '{{' + expression + '}}');
-          if (res === ('{{' + expression + '}}')) {
-            // if there was at least one item that was not evaluatable,
-            // we halt parsing and return the template;
+    /**
+     * Parse conditional template
+     * @param {[Object]} template 
+     * @param {Object} data 
+     * @returns Object | null
+     */
+    run: (template, data) => {
+      for (const entry of template) {
+        const [_key] = Object.keys(entry);
+        const _token = TRANSFORM.tokenize(_key);
+        // Process `#if` and `#elseif`
+        if (_token.name === '#if' || _token.name === '#elseif') {
+          const _expression = `{{ ${_token.expression} }}`;
+          // Parse expression
+          const _parsed = TRANSFORM.parse(data, _expression);
+          // If 
+          if (_parsed === _expression) {
             return template;
           } else {
-            if (res) {
-              // run the current one and return
-              return TRANSFORM.run(item[key], data);
-            } else {
-              // res was falsy. Ignore this branch and go on to the next item
+            if (_parsed) {
+              return TRANSFORM.run(entry[_key], data);
             }
           }
         } else {
-          // #else
-          // if you reached this point, it means:
-          //  1. there were no non-evaluatable expressions
-          //  2. Yet all preceding expressions evaluated to falsy value
-          //  Therefore we run this branch
-          return TRANSFORM.run(item[key], data);
+          // Process `#else`
+          return TRANSFORM.run(entry[_key], data);
         }
       }
-      // if you've reached this point, it means nothing matched.
-      // so return null
+      // If temlate is not valid return `null`
       return null;
     },
-    is: function(template) {
-      // TRUE ONLY IF it's in a correct format.
-      // Otherwise return the original template
-      // Condition 0. Must be an array
-      // Condition 1. Must have at least one item
-      // Condition 2. Each item in the array should be an object of a single key/value pair
-      // Condition 3. starts with #if
-      // Condition 4. in case there's more than two items, everything between the first and the last item should be #elseif
-      // Condition 5. in case there's more than two items, the last one should be either '#else' or '#elseif'
-      if (!Helper.is_array(template)) {
-        // Condition 0, it needs to be an array to be a conditional
-        return false;
+
+    /**
+     * This function validates wether the statement is a proper conditional statement
+     * In order to be valid the statement should match the following rules:
+     * 1. Accept an array of objects as the only parameter
+     * 2. Each object should contain '#if', '#elseif', 'else' as key
+     * 3. item should be in the format of {'#if item': 'blahblah'}
+     * If any of this conditions is not met the function returns `false`
+     * @param {[Object]} template 
+     * @returns {Boolean}
+     */
+    is: (template) => {
+      if (!_helper.isArray(template) || template.length === 0) return false;
+
+      const _hasOnlyObjects = template.some((e) => {
+        return Object.prototype.toString.call(e) === '[object Object]' || Object.keys(e).length === 1
+      });
+      if (!_hasOnlyObjects) return false;
+
+      // Get the first element of the array
+      const [_firstElement] = template;
+      for (const key in _firstElement) {
+        // Tokenize each object key. Token format is { name: 'string', expression: 'string' }
+        // Each token must be valid
+        const _token = TRANSFORM.tokenize(key);
+        // Validate _token using object destructuring
+        const { name = false, expression = false } = _token ?? {}
+        if (!name || !expression) { return false };
+        if (name.toLowerCase() !== '#if') { return false };
       }
-      // Condition 1.
-      // Must have at least one item
-      if (template.length === 0) {
-        return false;
-      }
-      // Condition 2.
-      // Each item in the array should be an object
-      // , and  of a single key/value pair
-      var containsValidObjects = true;
-      for (var i = 0; i < template.length; i++) {
-        var item = template[0];
-        if (typeof item !== 'object') {
-          containsValidObjects = false;
-          break;
-        }
-        if (Object.keys(item).length !== 1) {
-          // first item in the array has multiple key value pairs, so invalid.
-          containsValidObjects = false;
-          break;
-        }
-      }
-      if (!containsValidObjects) {
-        return false;
-      }
-      // Condition 3.
-      // the first item should have #if as its key
-      // the first item should also contain an expression
-      var first = template[0];
-      var func;
-      for (var key in first) {
-        func = TRANSFORM.tokenize(key);
-        if (!func) {
-          return false;
-        }
-        if (!func.name) {
-          return false;
-        }
-        // '{{#if }}'
-        if (!func.expression || func.expression.length === 0) {
-          return false;
-        }
-        if (func.name.toLowerCase() !== '#if') {
-          return false;
-        }
-      }
-      if (template.length === 1) {
-        // If we got this far and the template has only one item, it means
-        // template had one item which was '#if' so it's valid
-        return true;
-      }
-      // Condition 4.
-      // in case there's more than two items, everything between the first and the last item should be #elseif
-      var they_are_all_elseifs = true;
-      for (var template_index = 1; template_index < template.length-1; template_index++) {
-        var template_item = template[template_index];
-        for (var template_key in template_item) {
-          func = TRANSFORM.tokenize(template_key);
-          if (func.name.toLowerCase() !== '#elseif') {
-            they_are_all_elseifs = false;
-            break;
-          }
-        }
-      }
-      if (!they_are_all_elseifs) {
-        // There was at least one item that wasn't an elseif
-        // therefore invalid
-        return false;
-      }
-      // If you've reached this point, it means we have multiple items and everything between the first and the last item
-      // are elseifs
-      // Now we need to check the validity of the last item
-      // Condition 5.
-      // in case there's more than one item, it should end with #else or #elseif
-      var last = template[template.length-1];
-      for (var last_key in last) {
-        func = TRANSFORM.tokenize(last_key);
-        if (['#else', '#elseif'].indexOf(func.name.toLowerCase()) === -1) {
-          return false;
-        }
-      }
-      // Congrats, if you've reached this point, it's valid
+
+      // If the template has only one element then return true
+      if (template.length === 1) return true;
+
+      // Otherwise get all elements of the array except first one that we already validated
+      const [, ..._elements] = template;
+      // Remove the last element of the array for further processing as it must match different rules
+      const _lastElement = _elements.pop();
+
+      // Validate that all elements are `#elseif` tag
+      const _hasOnlyElseIfs = !_elements.some((e) => {
+        return Object.keys(e).some(key => {
+          const _token = TRANSFORM.tokenize(key);
+          return _token.name.toLowerCase() !== '#elseif';
+        });
+      });
+      // If at least one element is not `#elseif` return false
+      if (!_hasOnlyElseIfs) return false;
+
+      // Closing tag must be either `#else` or `#elseif`
+      const _hasValidClosingTag = Object.keys(_lastElement).some((key) => {
+        const _token = TRANSFORM.tokenize(key);
+        return ['#else', '#elseif'].includes(_token.name.toLowerCase());
+      });
+      // Return false if the closing tag does not match `#else` or `#elseif`
+      if (!_hasValidClosingTag) return false;
+
+      // Otherwise it is valid
       return true;
     },
+
   };
-  var TRANSFORM = {
-    memory: {},
-    transform: function(template, data, injection, serialized) {
-      var selector = null;
-      if (/#include/.test(JSON.stringify(template))) {
-        selector = function(key, value) { return /#include/.test(key) || /#include/.test(value); };
-      }
-      var res;
-      if (injection) {
-        // resolve template with selector
-        var resolved_template = SELECT.select(template, selector, serialized)
-          .transform(data, serialized)
-          .root();
-        // apply the resolved template on data
-        res = SELECT.select(data, null, serialized)
-          .inject(injection, serialized)
-          .transformWith(resolved_template, serialized)
-          .root();
-      } else {
-        // no need for separate template resolution step
-        // select the template with selector and transform data
-        res = SELECT.select(template, selector, serialized)
-          .transform(data, serialized)
-          .root();
-      }
-      if (serialized) {
-        // needs to return stringified version
-        return JSON.stringify(res);
-      } else {
-        return res;
-      }
+
+  /**
+   * Hashmap of all valid tags
+   * 
+   */
+  const $operators = {
+
+    '#include': (options = {}) => {
+      const { template, data, entry, token } = options
+      const _data = entry ? template[entry] : data;
+      const _result = token.expression ?
+        TRANSFORM.parse(_data, '{{' + token.expression + '}}', true) :
+        _data;
+      return _result;
     },
-    tokenize: function(str) {
-      // INPUT : string
-      // OUTPUT : {name: FUNCTION_NAME:STRING, args: ARGUMENT:ARRAY}
-      var re = /\{\{(.+)\}\}/g;
-      str = str.replace(re, '$1');
+
+    '#concat': (options = {}) => {
+      const { template, data, entry } = options
+
+      if (!_helper.isArray(template[entry])) return undefined;
+
+      const _result = template[entry].reduce((acc, el) => {
+        const _processed = TRANSFORM.run(el, data);
+        return acc.concat(_processed);
+      }, []);
+
+      return /\{\{(.*?)\}\}/.test(JSON.stringify(_result)) ? template : _result;
+    },
+
+    '#merge': (options = {}) => {
+      const { template, data, entry } = options
+
+      if (!_helper.isArray(template[entry])) return undefined;
+
+      const _result = template[entry].reduce((acc, el) => {
+        const _processed = TRANSFORM.run(el, data);
+        return { ...acc, ..._processed }
+      }, {});
+
+      if (typeof data === 'object') {
+        delete _result.$index
+        Object.keys(TRANSFORM.memory).forEach((key) => { delete _result[key] })
+      } else {
+        [String, Number, Function, Array, Boolean].forEach((c) => { delete c.prototype.$index })
+        Object.keys(TRANSFORM.memory).forEach((key) => {
+          [String, Number, Function, Array, Boolean].forEach((c) => { delete c.prototype[key] })
+        })
+      }
+
+      return _result
+    },
+
+    '#each': (options = {}) => {
+      const { template, data, entry, token } = options
+
+      const newData = TRANSFORM.parse(data, '{{' + token.expression + '}}', true);
+      if (!newData || !_helper.isArray(newData)) return template;
+
+      const _result = newData.reduce((acc, el, idx) => {
+        // setup metadata
+        if (typeof el === 'object') {
+          el.$index = idx
+          Object.keys(TRANSFORM.memory).forEach((key) => { el[key] = TRANSFORM.memory[key] })
+        } else {
+          [String, Number, Function, Array, Boolean].forEach((c) => { c.prototype.$index = idx })
+          Object.keys(TRANSFORM.memory).forEach((key) => {
+            [String, Number, Function, Array, Boolean].forEach((c) => { c.prototype[key] = TRANSFORM.memory[key] })
+          })
+        }
+
+        const _processed = TRANSFORM.run(template[entry], el);
+
+        // remove metadata
+        if (typeof el === 'object') {
+          delete el.$index
+          Object.keys(TRANSFORM.memory).forEach((key) => { delete el[key] })
+        } else {
+          [String, Number, Function, Array, Boolean].forEach((c) => { delete c.prototype.$index })
+          Object.keys(TRANSFORM.memory).forEach((key) => {
+            [String, Number, Function, Array, Boolean].forEach((c) => { delete c.prototype[key] })
+          })
+        }
+
+        return _processed ? [...acc, _processed] : acc
+      }, []);
+
+      return _result;
+    },
+
+    '#let': (options = {}) => {
+      const { template, data, entry } = options
+
+      if (!_helper.isArray(template[entry]) || template[entry].length !== 2) return undefined
+
+      const [_defs, _realTemplate] = template[entry];
+      // 1. Parse the first item to assign variables
+      const _parsedKeys = TRANSFORM.run(_defs, data);
+      // 2. modify the data
+      for (const key in _parsedKeys) {
+        TRANSFORM.memory[key] = _parsedKeys[key];
+        data[key] = _parsedKeys[key];
+      }
+
+      // 2. Pass it into TRANSFORM.run
+      const _result = TRANSFORM.run(_realTemplate, data);
+      return _result
+    },
+
+    '#?': (options = {}) => {
+      const { data, token } = options
+
+      const _template = '{{' + token.expression + '}}'
+      const _result = TRANSFORM.parse(data, _template);
+      if (!_result || (_result === _template)) {
+      } else {
+        return _result
+      }
+    }
+
+  };
+
+  const $transformations = {
+
+    /**
+     * 
+     * @param {*} template 
+     * @param {*} data 
+     * @returns 
+     */
+    string: (template, data) => {
+      if (!_helper.isTemplate(template)) {
+        return template;
+      }
+
+      const _reInclude = /\{\{([ ]*#include)[ ]*([^ ]*)\}\}/;
+      if (!_reInclude.test(template)) {
+        const _parsed = TRANSFORM.parse(data, template);
+        return _parsed
+      }
+
+      const _token = TRANSFORM.tokenize(template);
+
+      return _token.expression ?
+        TRANSFORM.parse(data, '{{' + _token.expression + '}}', true) :
+        template;
+    },
+
+    /**
+     * 
+     * @param {*} template 
+     * @param {*} data 
+     * @returns 
+     */
+    array: (template, data) => {
+      return Conditional.is(template) ?
+        Conditional.run(template, data) :
+        template.reduce((acc, entry) => {
+          const _transform = TRANSFORM.run(entry, data);
+          return _transform ? [...acc, _transform] : acc;
+        }, []);
+    },
+
+    /**
+     * 
+     * @param {*} template 
+     * @param {*} data 
+     * @returns 
+     */
+    object: (template, data) => {
+      let _result = {};
+
+      const _reInclude = /\{\{([ ]*#include)[ ]*(.*)\}\}/;
+      const _matchingEntries = Object.keys(template).filter(entry => _reInclude.test(entry));
+      if (_matchingEntries.length > 0) {
+        const _entry = _matchingEntries[0];
+        const _token = TRANSFORM.tokenize(_entry);
+        const _handler = $operators[_token?.name];
+        const _processed = _handler && _handler({ template, data, entry: _entry, token: _token });
+        _result = _processed
+      }
+
+      for (const entry in template) {
+        const _isTemplate = _helper.isTemplate(entry);
+
+        if (_isTemplate) {
+          const _token = TRANSFORM.tokenize(entry);
+          if (_token) {
+            if (_token.name !== '#include') {
+              const _handler = $operators[_token?.name];
+              const _processed = _handler && _handler({ template, data, entry: entry, token: _token });
+              if (_processed) {
+                _result = _token.name === '#merge' ? { ..._result, ..._processed } : _processed
+              }
+            }
+          } else {
+            const _entry = TRANSFORM.parse(data, entry);
+            const _value = TRANSFORM.parse(data, template[entry]);
+            if (_entry !== undefined && _value !== undefined) {
+              _result[_entry] = _value
+            }
+          };
+        }
+
+        const _isString = typeof template[entry] === 'string';
+
+        if (!_isTemplate && _isString) {
+          const _token = TRANSFORM.tokenize(template[entry])
+          const _handler = $operators[_token?.name]
+          if (_handler) {
+            const _processed = _handler({ template, data, entry: entry, token: _token });
+            if (_processed) {
+              _result[entry] = _processed
+            };
+          } else {
+            const _processed = TRANSFORM.run(template[entry], data);
+            if (_processed !== undefined) {
+              _result[entry] = _processed
+            };
+          }
+        }
+
+        if (!_isTemplate && !_isString) {
+          const _processed = TRANSFORM.run(template[entry], data);
+          if (_processed !== undefined) {
+            _result[entry] = _processed
+          };
+        }
+      }
+
+      return _result
+    },
+
+  };
+
+  /**
+   *  Transformation core.
+   *  `TRANSFORM` works 
+   */
+  const TRANSFORM = {
+
+    memory: {},
+
+    /**
+     * 
+     * @param {String} str 
+     * @returns {Object|Null}
+     */
+    tokenize: (str) => {
+      const _reTemplate = /\{\{(.+)\}\}/g;
+      const _str = str.replace(_reTemplate, '$1');
       // str : '#each $jason.items'
-
-      var tokens = str.trim().split(' ');
+      const _tokens = _str.trim().split(' ');
       // => tokens: ['#each', '$jason.items']
-
-      var func;
-      if (tokens.length > 0) {
-        if (tokens[0][0] === '#') {
-          func = tokens.shift();
-          // => func: '#each' or '#if'
-          // => tokens: ['$jason.items', '&&', '$jason.items.length', '>', '0']
-
-          var expression = tokens.join(' ');
-          // => expression: '$jason.items && $jason.items.length > 0'
-
-          return { name: func, expression: expression };
+      // let _token
+      if (_tokens.length > 0) {
+        if (_tokens[0][0] === '#') {
+          const _token = _tokens.shift();
+          // => _token: '#each' or '#if'
+          // => _tokens: ['$jason.items', '&&', '$jason.items.length', '>', '0']
+          const _expression = _tokens.join(' ');
+          // => _expression: '$jason.items && $jason.items.length > 0'
+          return { name: _token, expression: _expression };
         }
       }
       return null;
     },
-    run: function(template, data) {
-      var result;
-      var fun;
-      if (typeof template === 'string') {
-        // Leaf node, so call TRANSFORM.fillout()
-        if (Helper.is_template(template)) {
-          var include_string_re = /\{\{([ ]*#include)[ ]*([^ ]*)\}\}/g;
-          if (include_string_re.test(template)) {
-            fun = TRANSFORM.tokenize(template);
-            if (fun.expression) {
-              // if #include has arguments, evaluate it before attaching
-              result = TRANSFORM.fillout(data, '{{' + fun.expression + '}}', true);
-            } else {
-              // shouldn't happen =>
-              // {'wrapper': '{{#include}}'}
-              result = template;
-            }
-          } else {
-            // non-#include
-            result = TRANSFORM.fillout(data, template);
-          }
-        } else {
-          result = template;
-        }
-      } else if (Helper.is_array(template)) {
-        if (Conditional.is(template)) {
-          result = Conditional.run(template, data);
-        } else {
-          result = [];
-          for (var i = 0; i < template.length; i++) {
-            var item = TRANSFORM.run(template[i], data);
-            if (item) {
-              // only push when the result is not null
-              // null could mean #if clauses where nothing matched => In this case instead of rendering 'null', should just skip it completely
-              // Todo : Distinguish between #if arrays and ordinary arrays, and return null for ordinary arrays
-              result.push(item);
-            }
-          }
-        }
-      } else if (Object.prototype.toString.call(template) === '[object Object]') {
-        // template is an object
-        result = {};
 
-        // ## Handling #include
-        // This needs to precede everything else since it's meant to be overwritten
-        // in case of collision
-        var include_object_re = /\{\{([ ]*#include)[ ]*(.*)\}\}/;
-        var include_keys = Object.keys(template).filter(function(key) { return include_object_re.test(key); });
-        if (include_keys.length > 0) {
-        // find the first key with #include
-          fun = TRANSFORM.tokenize(include_keys[0]);
-          if (fun.expression) {
-            // if #include has arguments, evaluate it before attaching
-            result = TRANSFORM.fillout(template[include_keys[0]], '{{' + fun.expression + '}}', true);
-          } else {
-            // no argument, simply attach the child
-            result = template[include_keys[0]];
-          }
-        }
+    /**
+     * 
+     * @param {*} template 
+     * @param {Array|Object} context 
+     * @param {Boolean} inject 
+     * @param {Boolean} serialize 
+     * @returns 
+     */
+    transform: (template, context, inject, serialize) => {
+      const _selectorFn = /#include/.test(JSON.stringify(template)) ?
+        (key, value) => /#include/.test(key) || /#include/.test(value) :
+        null;
 
-        for (var key in template) {
-          // Checking to see if the key contains template..
-          // Currently the only case for this are '#each' and '#include'
-          if (Helper.is_template(key)) {
-            fun = TRANSFORM.tokenize(key);
-            if (fun) {
-              if (fun.name === '#include') {
-                // this was handled above (before the for loop) so just ignore
-              } else if (fun.name === '#let') {
-                if (Helper.is_array(template[key]) && template[key].length == 2) {
-                  var defs = template[key][0];
-                  var real_template = template[key][1];
+      const _resolvedTemplate = inject &&
+        SELECT.select(template, _selectorFn, serialize)
+          .transform(context, serialize)
+          .root();
 
-                  // 1. Parse the first item to assign variables
-                  var parsed_keys = TRANSFORM.run(defs, data);
+      const _result = inject ?
+        SELECT.select(context, null, serialize)
+          .inject(inject, serialize)
+          .transformWith(_resolvedTemplate, serialize)
+          .root() :
+        SELECT.select(template, _selectorFn, serialize)
+          .transform(context, serialize)
+          .root();
 
-                  // 2. modify the data
-                  for(var parsed_key in parsed_keys) {
-                    TRANSFORM.memory[parsed_key] = parsed_keys[parsed_key];
-                    data[parsed_key] = parsed_keys[parsed_key];
-                  }
+      return serialize ? JSON.stringify(_result) : _result;
+    },
 
-                  // 2. Pass it into TRANSFORM.run
-                  result = TRANSFORM.run(real_template, data);
-                }
-              } else if (fun.name === '#concat') {
-                if (Helper.is_array(template[key])) {
-                  result = [];
-                  template[key].forEach(function(concat_item) {
-                    var res = TRANSFORM.run(concat_item, data);
-                    result = result.concat(res);
-                  });
+    /**
+     * `TRANSFORM `
+     * @param {Object} template 
+     * @param {Object} context 
+     * @returns 
+     */
+    run: (template, context) => {
+      const _entryType = _helper.getJSONPropType(template);
+      if (!_entryType) return template;
+      const _handler = $transformations[_entryType];
+      return _handler ? _handler(template, context) : template;
+    },
 
-                  if (/\{\{(.*?)\}\}/.test(JSON.stringify(result))) {
-                    // concat should only trigger if all of its children
-                    // have successfully parsed.
-                    // so check for any template expression in the end result
-                    // and if there is one, revert to the original template
-                    result = template;
-                  }
-                }
-              } else if (fun.name === '#merge') {
-                if (Helper.is_array(template[key])) {
-                  result = {};
-                  template[key].forEach(function(merge_item) {
-                    var res = TRANSFORM.run(merge_item, data);
-                    for (var key in res) {
-                      result[key] = res[key];
-                    }
-                  });
-                  // clean up $index from the result
-                  // necessary because #merge merges multiple objects into one,
-                  // and one of them may be 'this', in which case the $index attribute
-                  // will have snuck into the final result
-                  if(typeof data === 'object') {
-                    delete result["$index"];
+    /**
+     * 
+     * @param {*} data 
+     * @param {*} template 
+     * @param {Boolean} raw 
+     * @returns 
+     */
+    parse: (data, template, raw) => {
+      // Run `parse` only if it's a valid template. Otherwise just return the original
+      if (!_helper.isTemplate(template)) return template;
 
-                    // #let handling
-                    for (var declared_vars in TRANSFORM.memory) {
-                      delete result[declared_vars];
-                    }
-                  } else {
-                    delete String.prototype.$index;
-                    delete Number.prototype.$index;
-                    delete Function.prototype.$index;
-                    delete Array.prototype.$index;
-                    delete Boolean.prototype.$index;
+      // Create a local copy for parsing
+      let _template = template;
 
-                    // #let handling
-                    for (var declared_vars in TRANSFORM.memory) {
-                      delete String.prototype[declared_vars];
-                      delete Number.prototype[declared_vars];
-                      delete Function.prototype[declared_vars];
-                      delete Array.prototype[declared_vars];
-                      delete Boolean.prototype[declared_vars];
-                    }
-                  }
-                }
-              } else if (fun.name === '#each') {
-                // newData will be filled with parsed results
-                var newData = TRANSFORM.fillout(data, '{{' + fun.expression + '}}', true);
+      const _reTemplate = /\{\{(.*?)\}\}/g;
+      const _variables = template.match(_reTemplate);
+      // Stop processing if no variables
+      if (!_variables) return template;
 
-                // Ideally newData should be an array since it was prefixed by #each
-                if (newData && Helper.is_array(newData)) {
-                  result = [];
-                  for (var index = 0; index < newData.length; index++) {
-                    // temporarily set $index
-                    if(typeof newData[index] === 'object') {
-                      newData[index]["$index"] = index;
-                      // #let handling
-                      for (var declared_vars in TRANSFORM.memory) {
-                        newData[index][declared_vars] = TRANSFORM.memory[declared_vars];
-                      }
-                    } else {
-                      String.prototype.$index = index;
-                      Number.prototype.$index = index;
-                      Function.prototype.$index = index;
-                      Array.prototype.$index = index;
-                      Boolean.prototype.$index = index;
-                      // #let handling
-                      for (var declared_vars in TRANSFORM.memory) {
-                        String.prototype[declared_vars] = TRANSFORM.memory[declared_vars];
-                        Number.prototype[declared_vars] = TRANSFORM.memory[declared_vars];
-                        Function.prototype[declared_vars] = TRANSFORM.memory[declared_vars];
-                        Array.prototype[declared_vars] = TRANSFORM.memory[declared_vars];
-                        Boolean.prototype[declared_vars] = TRANSFORM.memory[declared_vars];
-                      }
-                    }
-
-                    // run
-                    var loop_item = TRANSFORM.run(template[key], newData[index]);
-
-                    // clean up $index
-                    if(typeof newData[index] === 'object') {
-                      delete newData[index]["$index"];
-                      // #let handling
-                      for (var declared_vars in TRANSFORM.memory) {
-                        delete newData[index][declared_vars];
-                      }
-                    } else {
-                      delete String.prototype.$index;
-                      delete Number.prototype.$index;
-                      delete Function.prototype.$index;
-                      delete Array.prototype.$index;
-                      delete Boolean.prototype.$index;
-                      // #let handling
-                      for (var declared_vars in TRANSFORM.memory) {
-                        delete String.prototype[declared_vars];
-                        delete Number.prototype[declared_vars];
-                        delete Function.prototype[declared_vars];
-                        delete Array.prototype[declared_vars];
-                        delete Boolean.prototype[declared_vars];
-                      }
-                    }
-
-                    if (loop_item) {
-                      // only push when the result is not null
-                      // null could mean #if clauses where nothing matched => In this case instead of rendering 'null', should just skip it completely
-                      result.push(loop_item);
-                    }
-                  }
-                } else {
-                  // In case it's not an array, it's an exception, since it was prefixed by #each.
-                  // This probably means this #each is not for the current variable
-                  // For example {{#each items}} may not be an array, but just leave it be, so
-                  // But don't get rid of it,
-                  // Instead, just leave it as template
-                  // So some other parse run could fill it in later.
-                  result = template;
-                }
-              } // end of #each
-            } else { // end of if (fun)
-              // If the key is a template expression but aren't either #include or #each,
-              // it needs to be parsed
-              var k = TRANSFORM.fillout(data, key);
-              var v = TRANSFORM.fillout(data, template[key]);
-              if (k !== undefined && v !== undefined) {
-                result[k] = v;
-              }
-            }
-          } else {
-            // Helper.is_template(key) was false, which means the key was not a template (hardcoded string)
-            if (typeof template[key] === 'string') {
-              fun = TRANSFORM.tokenize(template[key]);
-              if (fun && fun.name === '#?') {
-                // If the key is a template expression but aren't either #include or #each,
-                // it needs to be parsed
-                var filled = TRANSFORM.fillout(data, '{{' + fun.expression + '}}');
-                if (filled === '{{' + fun.expression + '}}' || !filled) {
-                  // case 1.
-                  // not parsed, which means the evaluation failed.
-
-                  // case 2.
-                  // returns fasly value
-
-                  // both cases mean this key should be excluded
-                } else {
-                  // only include if the evaluation is truthy
-                  result[key] = filled;
-                }
-              } else {
-                var item = TRANSFORM.run(template[key], data);
-                if (item !== undefined) {
-                  result[key] = item;
-                }
-              }
-            } else {
-              var item = TRANSFORM.run(template[key], data);
-              if (item !== undefined) {
-                result[key] = item;
-              }
-            }
-          }
-        }
+      if (raw) {
+        const [_variable] = _variables;
+        _template = TRANSFORM._parse({ variable: _variable, data: data, template: null });
       } else {
-        return template;
+        _variables.forEach(_variable => {
+          _template = TRANSFORM._parse({ variable: _variable, data, template: _template });
+        });
       }
-      return result;
-    },
-    fillout: function(data, template, raw) {
-      // 1. fill out if possible
-      // 2. otherwise return the original
-      var replaced = template;
-      // Run fillout() only if it's a template. Otherwise just return the original string
-      if (Helper.is_template(template)) {
-        var re = /\{\{(.*?)\}\}/g;
 
-        // variables are all instances of {{ }} in the current expression
-        // for example '{{this.item}} is {{this.user}}'s' has two variables: ['this.item', 'this.user']
-        var variables = template.match(re);
-
-        if (variables) {
-          if (raw) {
-            // 'raw' is true only for when this is called from #each
-            // Because #each is expecting an array, it shouldn't be stringified.
-            // Therefore we pass template:null,
-            // which will result in returning the original result instead of trying to
-            // replace it into the template with a stringified version
-            replaced = TRANSFORM._fillout({
-              variable: variables[0],
-              data: data,
-              template: null,
-            });
-          } else {
-            // Fill out the template for each variable
-            for (var i = 0; i < variables.length; i++) {
-              var variable = variables[i];
-              replaced = TRANSFORM._fillout({
-                variable: variable,
-                data: data,
-                template: replaced,
-              });
-            }
-          }
-        } else {
-          return replaced;
-        }
-      }
-      return replaced;
+      return _template;
     },
-    _fillout: function(options) {
+
+    /**
+     * 
+     * @param {Object} options = { data, template, variable } 
+     * @returns 
+     */
+    _parse: (options) => {
       // Given a template and fill it out with passed slot and its corresponding data
-      var re = /\{\{(.*?)\}\}/g;
-      var full_re = /^\{\{((?!\}\}).)*\}\}$/;
-      var variable = options.variable;
-      var data = options.data;
-      var template = options.template;
+      const _reTemplate = /\{\{(.*?)\}\}/g;
+      const _reFull = /^\{\{((?!\}\}).)*\}\}$/;
+
+      const { data, template, variable } = options;
+      const makeNewFunction = (fnBody, context) => {
+        return /\breturn [^;]+;?[ ]*$/.test(fnBody) &&
+          /return[^}]*$/.test(fnBody) ?
+          new Function('with(this) {' + fnBody + '}').bind(context) :
+          new Function('with(this) {return (' + fnBody + ')}').bind(context);
+      }
+
       try {
         // 1. Evaluate the variable
-        var slot = variable.replace(re, '$1');
+        const slot = variable.replace(_reTemplate, '$1');
 
         // data must exist. Otherwise replace with blank
-        if (data) {
-          var func;
+        if (!data) { return template }
+
+        const _dataType = typeof data;
+        if (!['number', 'string', 'array', 'boolean', 'function'].includes(_dataType)) {
           // Attach $root to each node so that we can reference it from anywhere
-          var data_type = typeof data;
-          if (['number', 'string', 'array', 'boolean', 'function'].indexOf(data_type === -1)) {
-            data.$root = root;
-          }
-          // If the pattern ends with a return statement, but is NOT wrapped inside another function ([^}]*$), it's a function expression
-          var match = /function\([ ]*\)[ ]*\{(.*)\}[ ]*$/g.exec(slot);
-          if (match) {
-            func = Function('with(this) {' + match[1] + '}').bind(data);
-          } else if (/\breturn [^;]+;?[ ]*$/.test(slot) && /return[^}]*$/.test(slot)) {
-            // Function expression with explicit 'return' expression
-            func = Function('with(this) {' + slot + '}').bind(data);
-          } else {
-            // Function expression with explicit 'return' expression
-            // Ordinary simple expression that
-            func = Function('with(this) {return (' + slot + ')}').bind(data);
-          }
-          var evaluated = func();
-          delete data.$root;  // remove $root now that the parsing is over
-          if (evaluated) {
-            // In case of primitive types such as String, need to call valueOf() to get the actual value instead of the promoted object
-            evaluated = evaluated.valueOf();
-          }
-          if (typeof evaluated === 'undefined') {
-            // it tried to evaluate since the variable existed, but ended up evaluating to undefined
-            // (example: var a = [1,2,3,4]; var b = a[5];)
-            return template;
-          } else {
-            // 2. Fill out the template with the evaluated value
-            // Be forgiving and print any type, even functions, so it's easier to debug
-            if (evaluated) {
-              // IDEAL CASE : Return the replaced template
-              if (template) {
-                // if the template is a pure template with no additional static text,
-                // And if the evaluated value is an object or an array, we return the object itself instead of
-                // replacing it into template via string replace, since that will turn it into a string.
-                if (full_re.test(template)) {
-                  return evaluated;
-                } else {
-                  return template.replace(variable, evaluated);
-                }
-              } else {
-                return evaluated;
-              }
-            } else {
-              // Treat false or null as blanks (so that #if can handle it)
-              if (template) {
-                // if the template is a pure template with no additional static text,
-                // And if the evaluated value is an object or an array, we return the object itself instead of
-                // replacing it into template via string replace, since that will turn it into a string.
-                if (full_re.test(template)) {
-                  return evaluated;
-                } else {
-                  return template.replace(variable, '');
-                }
-              } else {
-                return '';
-              }
-            }
-          }
+          data.$root = root;
         }
-        // REST OF THE CASES
-        // if evaluated is null or undefined,
-        // it probably means one of the following:
-        //  1. The current data being parsed is not for the current template
-        //  2. It's an error
-        //
-        //  In either case we need to return the original template unparsed.
-        //    1. for case1, we need to leave the template alone so that the template can be parsed
-        //      by another data set
-        //    2. for case2, it's better to just return the template so it's easier to debug
-        return template;
-      } catch (err) {
+
+        // If the pattern ends with a return statement, but is NOT wrapped inside another function ([^}]*$), it's a function expression
+        const _hasFunction = /function\([ ]*\)[ ]*\{(.*)\}[ ]*$/g.exec(slot);
+        const _resolver = _hasFunction ?
+          makeNewFunction(_hasFunction[1], data) :
+          makeNewFunction(slot, data)
+
+        const _resolvedVal = _resolver();
+        const _isFalsy = !_resolvedVal
+        delete data.$root; // remove $root now that the parsing is over
+
+        // it tried to evaluate since the variable existed, but ended up evaluating to undefined
+        // (example: var a = [1,2,3,4]; var b = a[5];)
+        if (typeof _resolvedVal === 'undefined') { return template; }
+
+        // If template is not defined then return either resolved value or in case of falsy 
+        if (!template) return !_isFalsy ? _resolvedVal.valueOf(): ''
+        // Check if the template pure
+        return (_reFull.test(template)) ?
+          // Processing pure template
+          !_isFalsy ? _resolvedVal.valueOf() : _resolvedVal :
+          !_isFalsy ? template.replace(variable, _resolvedVal.valueOf()) : template.replace(variable, '')
+
+      } catch (_err) {
         return template;
       }
     },
+
   };
-  var SELECT = {
+
+  /**
+   *  Selection and filtering core.
+   *  `SELECT` takes 
+   */
+  const SELECT = {
     // current: currently accessed object
     // path: the path leading to this item
     // filter: The filter function to decide whether to select or not
@@ -627,306 +608,287 @@
     $selected: [],
     $injected: [],
     $progress: null,
-    exec: function(current, path, filter) {
+
+    /**
+     * 
+     * @param {String|Array|Object} entry 
+     * @param {String} keyPath 
+     * @param {Function} filter 
+     */
+    exec: function (entry, keyPath, filter) {
       // if current matches the pattern, put it in the selected array
-      if (typeof current === 'string') {
+      if (typeof entry === 'string') {
         // leaf node should be ignored
         // we're lookin for keys only
-      } else if (Helper.is_array(current)) {
-        for (var i=0; i<current.length; i++) {
-          SELECT.exec(current[i], path+'['+i+']', filter);
-        }
+      } else if (_helper.isArray(entry)) {
+        entry.forEach((el, idx) => SELECT.exec(el, keyPath.concat('[', idx, ']'), filter))
       } else {
         // object
-        for (var key in current) {
-          // '$root' is a special key that links to the root node
-          // so shouldn't be used to iterate
+        Object.keys(entry).forEach((key) => {
           if (key !== '$root') {
-            if (filter(key, current[key])) {
-              var index = SELECT.$selected.length;
-              SELECT.$selected.push({
-                index: index,
-                key: key,
-                path: path,
-                object: current,
-                value: current[key],
-              });
+            if (filter && filter(key, entry[key])) {
+              const idx = SELECT.$selected.length
+              SELECT.$selected.push({ index: idx, key: key, path: keyPath, object: entry, value: entry[key] })
             }
-            SELECT.exec(current[key], path+'["'+key+'"]', filter);
+            SELECT.exec(entry[key], keyPath.concat('["', key, '"]'), filter)
           }
-        }
+        })
       }
     },
-    inject: function(obj, serialized) {
-      SELECT.$injected = obj;
-      try {
-        if (serialized) SELECT.$injected = JSON.parse(obj);
-      } catch (error) { }
 
-      if (Object.keys(SELECT.$injected).length > 0) {
-        SELECT.select(SELECT.$injected);
-      }
+    /**
+     * 
+     * @param {*} obj 
+     * @param {Boolean} serialize 
+     * @returns 
+     */
+    inject: (obj, serialize) => {
+      SELECT.$injected = obj;
+
+      try {
+        if (serialize) SELECT.$injected = JSON.parse(obj);
+        // `JSON.parse` throws an exception processing templates however this can be safely ignored
+      } catch (_err) { }
+
+      if (Object.keys(SELECT.$injected).length > 0) SELECT.select(SELECT.$injected);
+
       return SELECT;
     },
-    // returns the object itself
-    select: function(obj, filter, serialized) {
-      // iterate '$selected'
-      //
-      /*
-      SELECT.$selected = [{
-        value {
-          '{{#include}}': {
-            '{{#each items}}': {
-              'type': 'label',
-              'text': '{{name}}'
-            }
-          }
-        },
-        path: '$jason.head.actions.$load'
-        ...
-      }]
-      */
-      var json = obj;
+
+    /**
+     * `SELECT.select`
+     * @param {Object|String} obj 
+     * @param {Function} filter 
+     * @param {Boolean} serialize 
+     * @returns 
+     */
+    select: (obj, filter, serialize) => {
+      let _obj = obj;
+
       try {
-        if (serialized) json = JSON.parse(obj);
-      } catch (error) { }
+        if (serialize) _obj = JSON.parse(obj);
+        // `JSON.parse` throws an exception processing templates however this can be safely ignored
+      } catch (_err) { }
 
       if (filter) {
         SELECT.$selected = [];
-        SELECT.exec(json, '', filter);
+        SELECT.exec(_obj, '', filter);
       } else {
         SELECT.$selected = null;
       }
 
-      if (json && (Helper.is_array(json) || typeof json === 'object')) {
+      if (_obj && (_helper.isArray(_obj) || typeof _obj === 'object')) {
         if (!SELECT.$progress) {
-          // initialize
-          if (Helper.is_array(json)) {
+          if (_helper.isArray(_obj)) {
             SELECT.$val = [];
-            SELECT.$selected_root = [];
+            SELECT.$selectedRoot = [];
           } else {
             SELECT.$val = {};
-            SELECT.$selected_root = {};
+            SELECT.$selectedRoot = {};
           }
         }
-        Object.keys(json).forEach(function(key) {
-        //for (var key in json) {
-          SELECT.$val[key] = json[key];
-          SELECT.$selected_root[key] = json[key];
+        Object.keys(_obj).forEach((key) => {
+          SELECT.$val[key] = _obj[key];
+          SELECT.$selectedRoot[key] = _obj[key];
         });
       } else {
-        SELECT.$val = json;
-        SELECT.$selected_root = json;
+        SELECT.$val = _obj;
+        SELECT.$selectedRoot = _obj;
       }
-      SELECT.$progress = true; // set the 'in progress' flag
+
+      SELECT.$progress = true;
 
       return SELECT;
     },
-    transformWith: function(obj, serialized) {
+
+    /**
+     * 
+     * @param {*} obj 
+     * @param {Boolean} serialize 
+     * @returns 
+     */
+    transformWith: (obj, serialize) => {
       SELECT.$parsed = [];
       SELECT.$progress = null;
-      /*
-      *  'selected' is an array that contains items that looks like this:
-      *  {
-      *    key: The selected key,
-      *    path: The path leading down to the selected key,
-      *    object: The entire object that contains the currently selected key/val pair
-      *    value: The selected value
-      *  }
-      */
-      var template = obj;
+
+      let _obj = obj;
       try {
-        if (serialized) template = JSON.parse(obj);
-      } catch (error) { }
+        if (serialize) _obj = JSON.parse(obj);
+        // `JSON.parse` throws an exception processing templates however this can be safely ignored
+      } catch (_err) { }
 
-      // Setting $root
-      SELECT.$template_root = template;
-      String.prototype.$root = SELECT.$selected_root;
-      Number.prototype.$root = SELECT.$selected_root;
-      Function.prototype.$root = SELECT.$selected_root;
-      Array.prototype.$root = SELECT.$selected_root;
-      Boolean.prototype.$root = SELECT.$selected_root;
-      root = SELECT.$selected_root;
-      // generate new $selected_root
+      SELECT.$templateRoot = _obj;
+      // Copy to global root varaible
+      root = SELECT.$selectedRoot;
+
+      [String, Number, Function, Array, Boolean].forEach((c) => { c.prototype.$root = SELECT.$selectedRoot });
+
       if (SELECT.$selected && SELECT.$selected.length > 0) {
-        SELECT.$selected.sort(function(a, b) {
-          // sort by path length, so that deeper level items will be replaced first
-          // TODO: may need to look into edge cases
-          return b.path.length - a.path.length;
-        }).forEach(function(selection) {
-        //SELECT.$selected.forEach(function(selection) {
-          // parse selected
-          var parsed_object = TRANSFORM.run(template, selection.object);
-
-          // apply the result to root
-          SELECT.$selected_root = Helper.resolve(SELECT.$selected_root, selection.path, parsed_object);
-
-          // update selected object with the parsed result
-          selection.object = parsed_object;
-        });
-        SELECT.$selected.sort(function(a, b) {
-          return a.index - b.index;
-        });
+        SELECT.$selected
+          .sort((a, b) => b.path.length - a.path.length)
+          .forEach((item) => {
+            const _parsed = TRANSFORM.run(_obj, item.object);
+            SELECT.$selectedRoot = _helper.setPropByKeyPath(SELECT.$selectedRoot, item.path, _parsed);
+            item.object = _parsed;
+          });
+        SELECT.$selected.sort((a, b) => a.index - b.index);
       } else {
-        var parsed_object = TRANSFORM.run(template, SELECT.$selected_root);
-        // apply the result to root
-        SELECT.$selected_root = Helper.resolve(SELECT.$selected_root, '', parsed_object);
+        const _parsed = TRANSFORM.run(_obj, SELECT.$selectedRoot);
+        SELECT.$selectedRoot = _helper.setPropByKeyPath(SELECT.$selectedRoot, '', _parsed);
       }
-      delete String.prototype.$root;
-      delete Number.prototype.$root;
-      delete Function.prototype.$root;
-      delete Array.prototype.$root;
-      delete Boolean.prototype.$root;
+
+      [String, Number, Function, Array, Boolean].forEach((c) => { delete c.prototype.$root });
+
       return SELECT;
     },
-    transform: function(obj, serialized) {
+
+    /**
+     * 
+     * @param {*} obj 
+     * @param {Boolean} serialize 
+     * @returns 
+     */
+    transform: (obj, serialize) => {
       SELECT.$parsed = [];
       SELECT.$progress = null;
-      /*
-      'selected' is an array that contains items that looks like this:
 
-      {
-        key: The selected key,
-        path: The path leading down to the selected key,
-        object: The entire object that contains the currently selected key/val pair
-        value: The selected value
-      }
-      */
-      var data = obj;
+      let _obj = obj;
       try {
-        if (serialized) data = JSON.parse(obj);
-      } catch (error) { }
+        if (serialize) _obj = JSON.parse(obj);
+        // `JSON.parse` throws an exception processing templates however this can be safely ignored
+      } catch (_err) { }
 
-      // since we're assuming that the template has been already selected, the $template_root is $selected_root
-      SELECT.$template_root = SELECT.$selected_root;
+      SELECT.$templateRoot = SELECT.$selectedRoot;
+      // Copy to global root varaible
+      root = _obj;
 
-      String.prototype.$root = data;
-      Number.prototype.$root = data;
-      Function.prototype.$root = data;
-      Array.prototype.$root = data;
-      Boolean.prototype.$root = data;
-      root = data;
+      [String, Number, Function, Array, Boolean].forEach((c) => { c.prototype.$root = _obj });
 
       if (SELECT.$selected && SELECT.$selected.length > 0) {
-        SELECT.$selected.sort(function(a, b) {
-          // sort by path length, so that deeper level items will be replaced first
-          // TODO: may need to look into edge cases
-          return b.path.length - a.path.length;
-        }).forEach(function(selection) {
-          // parse selected
-          var parsed_object = TRANSFORM.run(selection.object, data);
-          // apply the result to root
-          SELECT.$template_root = Helper.resolve(SELECT.$template_root, selection.path, parsed_object);
-          SELECT.$selected_root = SELECT.$template_root;
-
-          // update selected object with the parsed result
-          selection.object = parsed_object;
-        });
-        SELECT.$selected.sort(function(a, b) {
-          return a.index - b.index;
-        });
+        SELECT.$selected
+          .sort((a, b) => b.path.length - a.path.length)
+          .forEach((item) => {
+            const _parsed = TRANSFORM.run(item.object, _obj);
+            SELECT.$templateRoot = _helper.setPropByKeyPath(SELECT.$templateRoot, item.path, _parsed);
+            SELECT.$selectedRoot = SELECT.$templateRoot;
+            item.object = _parsed;
+          });
+        SELECT.$selected.sort((a, b) => a.index - b.index);
       } else {
-        var parsed_object = TRANSFORM.run(SELECT.$selected_root, data);
-        // apply the result to root
-        SELECT.$template_root = Helper.resolve(SELECT.$template_root, '', parsed_object);
-        SELECT.$selected_root = SELECT.$template_root;
+        const _parsed = TRANSFORM.run(SELECT.$selectedRoot, _obj);
+        SELECT.$templateRoot = _helper.setPropByKeyPath(SELECT.$templateRoot, '', _parsed);
+        SELECT.$selectedRoot = SELECT.$templateRoot;
       }
-      delete String.prototype.$root;
-      delete Number.prototype.$root;
-      delete Function.prototype.$root;
-      delete Array.prototype.$root;
-      delete Boolean.prototype.$root;
+
+      [String, Number, Function, Array, Boolean].forEach((c) => { delete c.prototype.$root });
+
       return SELECT;
     },
 
     // Terminal methods
-    objects: function() {
+    /**
+     * 
+     * @returns {[Objects]}
+     */
+    objects: () => {
       SELECT.$progress = null;
-      if (SELECT.$selected) {
-        return SELECT.$selected.map(function(item) { return item.object; });
-      } else {
-        return [SELECT.$selected_root];
-      }
+      return SELECT.$selected ?
+        SELECT.$selected.map(entry => entry.object) :
+        [SELECT.$selectedRoot];
     },
-    keys: function() {
+
+    /**
+     * 
+     * @returns {}
+     */
+    keys: () => {
       SELECT.$progress = null;
-      if (SELECT.$selected) {
-        return SELECT.$selected.map(function(item) { return item.key; });
-      } else {
-        if (Array.isArray(SELECT.$selected_root)) {
-          return Object.keys(SELECT.$selected_root).map(function(key) { return parseInt(key); });
-        } else {
-          return Object.keys(SELECT.$selected_root);
-        }
-      }
+      return SELECT.$selected ?
+        SELECT.$selected.map(entry => entry.key) :
+        Array.isArray(SELECT.$selectedRoot) ?
+          Object.keys(SELECT.$selectedRoot).map(entry => parseInt(entry)) :
+          Object.keys(SELECT.$selectedRoot);
     },
-    paths: function() {
+
+    /**
+     * 
+     * @returns {[String]}
+     */
+    paths: () => {
       SELECT.$progress = null;
-      if (SELECT.$selected) {
-        return SELECT.$selected.map(function(item) { return item.path; });
-      } else {
-        if (Array.isArray(SELECT.$selected_root)) {
-          return Object.keys(SELECT.$selected_root).map(function(item) {
-            // key is integer
-            return '[' + item + ']';
-          });
-        } else {
-          return Object.keys(SELECT.$selected_root).map(function(item) {
-            // key is string
-            return '["' + item + '"]';
-          });
-        }
-      }
+      return SELECT.$selected ?
+        SELECT.$selected.map(entry => entry.path) :
+        Array.isArray(SELECT.$selectedRoot) ?
+          // key is integer
+          Object.keys(SELECT.$selectedRoot).map(entry => '[' + entry + ']') :
+          // key is string
+          Object.keys(SELECT.$selectedRoot).map(entry => '["' + entry + '"]');
     },
-    values: function() {
+
+    /**
+     * 
+     * @returns {}
+     */
+    values: () => {
       SELECT.$progress = null;
-      if (SELECT.$selected) {
-        return SELECT.$selected.map(function(item) { return item.value; });
-      } else {
-        return Object.values(SELECT.$selected_root);
-      }
+      return SELECT.$selected ?
+        SELECT.$selected.map(entry => entry.value) :
+        Object.values(SELECT.$selectedRoot);
     },
-    root: function() {
+
+    /**
+     * 
+     * @returns 
+     */
+    root: () => {
       SELECT.$progress = null;
-      return SELECT.$selected_root;
+      return SELECT.$selectedRoot;
     },
+
   };
 
   // Native JSON object override
-  var _stringify = JSON.stringify;
-  JSON.stringify = function(val, replacer, spaces) {
-    var t = typeof val;
-    if (['number', 'string', 'boolean'].indexOf(t) !== -1) {
-      return _stringify(val, replacer, spaces);
+  const _stringify = JSON.stringify;
+  // Syntax: JSON.stringify(value, replacer, space)
+  // @value: The value to convert to a JSON string.
+  // @replacer [Optional]: A function that alters the behavior of the stringification process
+  // @space [Optional]: A String or Number object that's used to insert white space into the 
+  // output JSON string for readability purposes.
+
+  JSON.stringify = (value, replacer, spaces) => {
+    const _t = typeof value;
+    if (['number', 'string', 'boolean'].includes(_t)) {
+      return _stringify(value, replacer, spaces);
     }
     if (!replacer) {
-      return _stringify(val, function(key, val) {
-        if (SELECT.$injected && SELECT.$injected.length > 0 && SELECT.$injected.indexOf(key) !== -1) { return undefined; }
-        if (key === '$root' || key === '$index') {
-          return undefined;
-        }
-        if (key in TRANSFORM.memory) {
-          return undefined;
-        }
+      return _stringify(value, (key, val) => {
+
+        if (SELECT.$injected && SELECT.$injected.length > 0 &&
+          SELECT.$injected.indexOf(key) !== -1) { return undefined; }
+
+        if (key === '$root' || key === '$index') { return undefined; }
+
+        if (key in TRANSFORM.memory) { return undefined; }
+
         if (typeof val === 'function') {
           return '(' + val.toString() + ')';
         } else {
           return val;
         }
+
       }, spaces);
     } else {
-      return _stringify(val, replacer, spaces);
+      return _stringify(value, replacer, spaces);
     }
   };
 
   // Export
   if (typeof exports !== 'undefined') {
-    var x = {
+    const x = {
       TRANSFORM: TRANSFORM,
-      transform: TRANSFORM,
       SELECT: SELECT,
       Conditional: Conditional,
-      Helper: Helper,
+      Helper: _helper,
       inject: SELECT.inject,
       select: SELECT.select,
       transform: TRANSFORM.transform,
@@ -940,4 +902,5 @@
       transform: TRANSFORM.transform,
     };
   }
+
 }());
