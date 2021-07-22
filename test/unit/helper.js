@@ -14,13 +14,13 @@ describe('resolve', function(){
         "items": ["a", "b"]
       }
     };
-    compare(st.Helper.resolve(data, "['title']", "bye"), {
+    compare(st.Helper.setPropByKeyPath(data, "['title']", "bye"), {
       "title": "bye",
       "body": {
         "items": ["a", "b"]
       }
     });
-    compare(st.Helper.resolve(data, "['body']['items'][1]", "c"), {
+    compare(st.Helper.setPropByKeyPath(data, "['body']['items'][1]", "c"), {
       "title": "bye",
       "body": {
         "items": ["a", "c"]

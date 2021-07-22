@@ -98,10 +98,10 @@ describe("TRANSFORM.run", function() {
     })
   });
 });
-describe('TRANSFORM.fillout', function() {
+describe('TRANSFORM.parse', function() {
   describe("string interpolation should work", function(){
     it('should correctly parse when a template is used along with static string', function(){
-      var actual = st.TRANSFORM.fillout(
+      var actual = st.TRANSFORM.parse(
         {"user": "tom"},
         "This is {{user}}"
       );
@@ -110,7 +110,7 @@ describe('TRANSFORM.fillout', function() {
   });
   describe("handling multiple templates in a string", function(){
     it('should correctly parse multiple templates in a string', function(){
-      var actual = st.TRANSFORM.fillout(
+      var actual = st.TRANSFORM.parse(
         {"users": ["tom", "jane", "obafe"]},
         "This is an {{users[0]}} and {{users[1]}}"
       );
@@ -119,7 +119,7 @@ describe('TRANSFORM.fillout', function() {
     it('should correctly parse multiple templates in a string', function(){
       var template = "{{$jason.title}} and {{$jason.description}}";
       var data = {"$jason": {"title": "This is a title", "description": "This is a description"}};
-      var actual = st.TRANSFORM.fillout(data, template);
+      var actual = st.TRANSFORM.parse(data, template);
       var expected = "This is a title and This is a description";
       compare(actual, expected);
     });
@@ -137,15 +137,15 @@ describe('TRANSFORM.fillout', function() {
         "url": "https://vjs.zencdn.net/v/oceans.mp4"
       };
       var data = {"$cache": {}};
-      var actual = st.TRANSFORM.fillout(data, template);
+      var actual = st.TRANSFORM.parse(data, template);
       compare(actual, template);
     });
     it('should return the template string when the result is null', function(){
-      var actual1 = st.TRANSFORM.fillout(
+      var actual1 = st.TRANSFORM.parse(
         {"users": ["tom", "jane", "obafe"]},
         "This is an {{users[0]}}"
       );
-      var actual2 = st.TRANSFORM.fillout(
+      var actual2 = st.TRANSFORM.parse(
         {"users": ["tom", "jane", "obafe"]},
         "This is an {{items[0]}}"
       );
@@ -155,141 +155,141 @@ describe('TRANSFORM.fillout', function() {
   });
   describe("Handling objects and array results", function(){
     it('should return an actual array if the result is an array', function(){
-      var actual = st.TRANSFORM.fillout( {"a": ['item1','item2']}, "{{a}}");
+      var actual = st.TRANSFORM.parse( {"a": ['item1','item2']}, "{{a}}");
       compare(actual, ['item1', 'item2']);
     });
     it('standalone this where this is object', function(){
-      var actual = st.TRANSFORM.fillout( {"a": {"key": 'item1'}}, "{{a}}");
+      var actual = st.TRANSFORM.parse( {"a": {"key": 'item1'}}, "{{a}}");
       compare(actual, {"key": "item1"});
     });
   });
   describe("handling map", function(){
     it('correctly runs map function', function(){
       var data = {"items": {"0": {name: "kate", age: "23"}, "1": {name: "Lassie", age: "3"}}};
-      var actual = st.TRANSFORM.fillout(data, "{{Object.keys(items).map(function(key){return items[key].name;})}}");
+      var actual = st.TRANSFORM.parse(data, "{{Object.keys(items).map(function(key){return items[key].name;})}}");
       compare(actual, ["kate", "Lassie"]);
     });
     it('correctly parses a map loop: *this* edition', function(){
       var data =  ["1", "2", "3"];
       var template = "{{this.map(function(item){ return {db: item}; }) }}";
-      var actual = st.TRANSFORM.fillout(data, template);
+      var actual = st.TRANSFORM.parse(data, template);
       compare(actual, [{"db": "1"}, {"db": "2"}, {"db": "3"}]);
     });
     it('correctly parses a map loop: $jason edition', function(){
       var data =  {"$jason": ["1", "2", "3"]};
       var template = "{{$jason.map(function(item){return {db: item};})}}";
-      var actual = st.TRANSFORM.fillout(data, template);
+      var actual = st.TRANSFORM.parse(data, template);
       compare(actual, [{"db": "1"}, {"db": "2"}, {"db": "3"}]);
     });
     it('correctly parses a local variable inside of a map loop', function(){
       var data =  {"$params": {"title": "title", "url": "url"}, "$jason": ["1", "2", "3"]};
       var template = "{{$jason.map(function(item){return {db: item, title: $params.title, url: $params.url};})}}";
-      var actual = st.TRANSFORM.fillout(data, template);
+      var actual = st.TRANSFORM.parse(data, template);
       compare(actual, [{"db": "1", "title": "title", "url": "url"}, {"db": "2", "title": "title", "url": "url"}, {"db": "3", "title": "title", "url": "url"}]);
     });
   });
   describe("Handling 'this'", function(){
     it('standalone this where this is array', function(){
-      var actual = st.TRANSFORM.fillout( ['item1','item2'], "This is an {{this}}");
+      var actual = st.TRANSFORM.parse( ['item1','item2'], "This is an {{this}}");
       compare(actual, "This is an item1,item2");
     });
     it('standalone this where this is string', function(){
-      var actual = st.TRANSFORM.fillout( "item1", "This is an {{this}}");
+      var actual = st.TRANSFORM.parse( "item1", "This is an {{this}}");
       compare(actual, "This is an item1");
     });
     it('standalone this where this is object', function(){
-      var actual = st.TRANSFORM.fillout( {"key": 'item1'}, "This is an {{this}}");
+      var actual = st.TRANSFORM.parse( {"key": 'item1'}, "This is an {{this}}");
       compare(actual, "This is an [object Object]");
     });
     it('attributes for this', function(){
-      var actual = st.TRANSFORM.fillout(
+      var actual = st.TRANSFORM.parse(
         {"item": "item1"},
         "This is an {{this.item}}"
       );
       compare(actual, "This is an item1");
     });
     it('when this is an array', function(){
-      var actual = st.TRANSFORM.fillout(
+      var actual = st.TRANSFORM.parse(
         ['item1', 'item2', 'item3'],
         "This is an {{this[1]}}"
       );
       compare(actual, "This is an item2");
     });
   });
-  describe("Handling 'fillout' exceptions", function(){
+  describe("Handling 'parse' exceptions", function(){
     it('should handle try to wrap the expression in an immediately invoked function and try one more time', function(){
-      var actual1 = st.TRANSFORM.fillout(
+      var actual1 = st.TRANSFORM.parse(
         {a: []},
         "{{a.push(\"2\"); return a;}}"
       );
       compare(actual1, ["2"]);
 
-      var actual2 = st.TRANSFORM.fillout(
+      var actual2 = st.TRANSFORM.parse(
         {a: ["1"]},
         "{{a.push(\"2\"); return a;}}"
       );
       compare(actual2, ["1","2"]);
 
-      var actual3 = st.TRANSFORM.fillout(
+      var actual3 = st.TRANSFORM.parse(
         {a: ["1"]},
         "{{a.push(\"2\"); return a}}"
       );
       compare(actual3, ["1","2"]);
     });
     it('should handle try to wrap the expression in an immediately invoked function and try one more time, for even more complex expressions', function(){
-      var actual = st.TRANSFORM.fillout(
+      var actual = st.TRANSFORM.parse(
         {created_at: 1475369605422},
         "{{var d = new Date(created_at); var day = d.getUTCDay(); var daymap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; var realDay = daymap[parseInt(day)]; var h = d.getUTCHours(); var m = d.getUTCMinutes(); var suffix = (h > 11 ? 'pm' : 'am'); var hh = (h > 12 ? h - 12 : h); var mm = (m > 9 ? m : '0'+m); return realDay + ' ' + hh + ':' + mm + ' ' + suffix;}}"
       );
       compare(actual, "Sunday 0:53 am");
     });
     it('should return a blank space when the evaluated value is null or false', function(){
-      var actual = st.TRANSFORM.fillout(
+      var actual = st.TRANSFORM.parse(
         {a: false},
         "This is a [{{a}}]"
       );
       compare(actual, "This is a []");
 
-      var actual2 = st.TRANSFORM.fillout(
+      var actual2 = st.TRANSFORM.parse(
         {a: null},
         "This is a [{{a}}]"
       );
       compare(actual2, "This is a []");
     });
     it('should return blank space when an evaluatable expression is passed in and evaluates to false or null' , function(){
-      var actual = st.TRANSFORM.fillout(
+      var actual = st.TRANSFORM.parse(
         ['item1', 'item2', 'item3', null, false],
         "This is an [{{this[3]}}]"
       );
       compare(actual, "This is an []");
 
-      var actual2 = st.TRANSFORM.fillout(
+      var actual2 = st.TRANSFORM.parse(
         ['item1', 'item2', 'item3', null, false],
         "This is a [{{this[4]}}]"
       );
       compare(actual2, "This is a []");
     });
     it('should not fill in the template if a null or false primitive is explicitly passed in', function(){
-      var actual = st.TRANSFORM.fillout(
+      var actual = st.TRANSFORM.parse(
         null,
         "This is a {{this}}"
       );
       compare(actual, "This is a {{this}}");
 
-      var actual2 = st.TRANSFORM.fillout(
+      var actual2 = st.TRANSFORM.parse(
         false,
         "This is a {{this}}"
       );
       compare(actual2, "This is a {{this}}");
     });
     it('should return the template when an evaluatable expression is passed in but cannot be evaluated (undefined)' , function(){
-      var actual = st.TRANSFORM.fillout(
+      var actual = st.TRANSFORM.parse(
         ['item1', 'item2', 'item3'],
         "This is an {{unexisting_variable[4]}}"
       );
       compare(actual, "This is an {{unexisting_variable[4]}}");
 
-      var actual2 = st.TRANSFORM.fillout(
+      var actual2 = st.TRANSFORM.parse(
         ['item1', 'item2', 'item3'],
         "This is an {{this[4]}}"
       );
