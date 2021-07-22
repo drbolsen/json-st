@@ -1,5 +1,5 @@
 {
-  "name": "stjs",
+  "name": "json-st",
   "version": "0.0.5",
   "description": "JSON Template over JSON",
   "main": "st.js",
@@ -7,7 +7,8 @@
     "test": "test"
   },
   "devDependencies": {
-    "eslint": "^4.7.1",
+    "eslint": "^7.31.0",
+    "eslint-plugin-standard": "^5.0.0",
     "he": "^1.1.1",
     "json-stable-stringify": "^1.0.1",
     "mocha": "^3.5.3",
@@ -15,16 +16,17 @@
   },
   "scripts": {
     "test": "mocha --recursive test/unit/",
-    "lint": "eslint src/st.js"
+    "lint": "eslint src/st.js",
+    "lint-init": "eslint --init"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SelectTransform/st.js.git"
+    "url": "git+https://github.com/drbolsen/json-st.git"
   },
   "author": "gliechtenstein",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/SelectTransform/st.js/issues"
+    "url": "https://github.com/drbolsen/json-st/issues"
   },
-  "homepage": "https://github.com/SelectTransform/st.js#readme"
+  "homepage": "https://github.com/drbolsen/json-st#readme"
 }
