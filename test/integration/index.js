@@ -1,4 +1,4 @@
-const ST = require('../../st')
+const ST = require('../../st.js')
 const result = ST.transform({
   'rows': {
     '{{#each items}}': {
