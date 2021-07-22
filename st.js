@@ -10,13 +10,8 @@
      * @returns {Boolean}
      */
     isTemplate: (s) => {
-      if (debug) {
-        console.log('[_helper].isTemplate')
-        console.log('[_helper].isTemplate `param` :', s)
-      }
       const _reTagTemplate = /\{\{(.+)\}\}/g;
       const _result = _reTagTemplate.test(s);
-      if (debug) { console.log('[_helper].isTemplate `return` :', _result) }
       return _result
     },
 
@@ -27,10 +22,6 @@
      * @returns {Boolean}
      */
     isArrayPoly: (v) => {
-      if (debug) {
-        console.log('[_helper].isArrayPoly')
-        console.log('[_helper].isArrayPoly `param` :', v)
-      }
       const _result = !!v &&
         typeof v === 'object' &&
         typeof v.length === 'number' &&
@@ -41,8 +32,6 @@
             (v.length - 1) in v
           )
         );
-
-      if (debug) { console.log('[_helper].isArrayPoly `return` :', _result) }
       return _result
     },
 
@@ -55,13 +44,7 @@
     isArray: (v) => {
       // Using build-in Javascript check for arrays
       // or polyfil version in case it is not available
-      if (debug) {
-        console.log('[_helper].isArray')
-        console.log('[_helper].isArray `param` :', v)
-      }
       const _result = Array.isArray(v) || _helper.isArrayPoly(v);
-
-      if (debug) { console.log('[_helper].isArray `return` :', _result) }
       return _result
     },
 
