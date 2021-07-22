@@ -1,85 +1,86 @@
-var assert = require('assert');
-var st = require('../../../st.js');
-var stringify = require('json-stable-stringify');
+/* eslint-disable no-undef */
+var assert = require('assert')
+var st = require('../../../st.js')
+var stringify = require('json-stable-stringify')
 
-var compare = function(actual, expected){
-  assert.equal(stringify(actual), stringify(expected));
-};
+var compare = function (actual, expected) {
+  assert.strictEqual(stringify(actual), stringify(expected))
+}
 
 // #merge 
 // merges attributes from all objects in an array into a single object
 
-describe('merge', function(){
-  it('static item + static item', function() {
+describe('merge', function () {
+  it('static item + static item', function () {
     var data = {
-    };
+    }
     var template = {
-      "{{#merge}}": [
+      '{{#merge}}': [
         {
-          "type": "label",
-          "text": "Hello"
+          'type': 'label',
+          'text': 'Hello'
         },
         {
-          "style": {
-            "align": "center",
-            "size": "15"
+          'style': {
+            'align': 'center',
+            'size': '15'
           },
-          "action": {
-            "type": "$render"
+          'action': {
+            'type': '$render'
           }
         }
       ]
-    };
-    var actual = st.TRANSFORM.transform(template, data);
+    }
+    var actual = st.TRANSFORM.transform(template, data)
     var expected = {
-      "type": "label",
-      "text": "Hello",
-      "style": {
-        "align": "center",
-        "size": "15"
+      'type': 'label',
+      'text': 'Hello',
+      'style': {
+        'align': 'center',
+        'size': '15'
       },
-      "action": {
-        "type": "$render"
+      'action': {
+        'type': '$render'
       }
     }
-    compare(actual, expected);
+    compare(actual, expected)
   })
-  
-  it('dynamic item + dynamic item', function() { 
+
+  it('dynamic item + dynamic item', function () {
     var data = {
-      numbers: [1,2,3],
-      align: "right",
-      size: "14"
-    };
+      numbers: [1, 2, 3],
+      align: 'right',
+      size: '14'
+    }
     var template = {
-      "{{#merge}}": [
+      '{{#merge}}': [
         {
-          "type": "label",
-          "text": "Length: {{numbers.length}}"
+          'type': 'label',
+          'text': 'Length: {{numbers.length}}'
         },
         {
-          "style": {
-            "align": "{{align}}",
-            "size": "{{size}}"
+          'style': {
+            'align': '{{align}}',
+            'size': '{{size}}'
           },
-          "action": {
-            "type": "$render"
+          'action': {
+            'type': '$render'
           }
         }
       ]
-    };
-    var actual = st.TRANSFORM.transform(template, data);
+    }
+    var actual = st.TRANSFORM.transform(template, data)
     var expected = {
-      "type": "label",
-      "text": "Length: 3",
-      "style": {
-        "align": "right",
-        "size": "14"
+      'type': 'label',
+      'text': 'Length: 3',
+      'style': {
+        'align': 'right',
+        'size': '14'
       },
-      "action": {
-        "type": "$render"
+      'action': {
+        'type': '$render'
       }
     }
-    compare(actual, expected);
-  });
-});
+    compare(actual, expected)
+  })
+})

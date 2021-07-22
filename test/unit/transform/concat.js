@@ -1,10 +1,11 @@
-var assert = require('assert');
-var st = require('../../../st.js');
-var stringify = require('json-stable-stringify');
+/* eslint-disable no-undef */
+var assert = require('assert')
+var st = require('../../../st.js')
+var stringify = require('json-stable-stringify')
 
-var compare = function(actual, expected){
-  assert.equal(stringify(actual), stringify(expected));
-};
+var compare = function (actual, expected) {
+  assert.strictEqual(stringify(actual), stringify(expected))
+}
 
 // TODO: #concat
 // #concat [a,b]= [a,b]
@@ -13,267 +14,267 @@ var compare = function(actual, expected){
 // #concat [a,[b,c],d]= [a,b,c,d]
 // #concat [[a,b],[c,d]]= [a,b,c,d]
 
-describe('concat', function(){
-  it('concat should only trigger if all of its children successfully parses', function() {
+describe('concat', function () {
+  it('concat should only trigger if all of its children successfully parses', function () {
     var data = {
-      numbers: [1,2,3,4,5]
+      numbers: [1, 2, 3, 4, 5]
     }
     var template = {
-      "items": {
-        "{{#concat}}": [
+      'items': {
+        '{{#concat}}': [
           {
-            "type": "label",
-            "text": "header"
+            'type': 'label',
+            'text': 'header'
           },
           {
-            "{{#each numbers}}": {
-              "type": "label",
-              "text": "{{item}}"
+            '{{#each numbers}}': {
+              'type': 'label',
+              'text': '{{item}}'
             }
           }
         ]
       }
     }
-    var actual = st.TRANSFORM.transform(template, data);
-    compare(actual, template);
+    var actual = st.TRANSFORM.transform(template, data)
+    compare(actual, template)
   })
-  it('item + array', function() { 
+  it('item + array', function () {
     var data = {
-      numbers: [1,2,3,4,5]
-    };
+      numbers: [1, 2, 3, 4, 5]
+    }
     var template = {
-      "items": {
-        "{{#concat}}": [
+      'items': {
+        '{{#concat}}': [
           {
-            "type": "label",
-            "text": "header"
+            'type': 'label',
+            'text': 'header'
           },
           {
-            "{{#each numbers}}": {
-              "type": "label",
-              "text": "{{this}}"
+            '{{#each numbers}}': {
+              'type': 'label',
+              'text': '{{this}}'
             }
           }
         ]
       }
-    };
-    var actual = st.TRANSFORM.transform(template, data);
+    }
+    var actual = st.TRANSFORM.transform(template, data)
     var expected = {
       items: [{
-        "type": "label",
-        "text": "header"
+        'type': 'label',
+        'text': 'header'
       }, {
-        "type": "label",
-        "text": 1
+        'type': 'label',
+        'text': 1
       }, {
-        "type": "label",
-        "text": 2
+        'type': 'label',
+        'text': 2
       }, {
-        "type": "label",
-        "text": 3
+        'type': 'label',
+        'text': 3
       }, {
-        "type": "label",
-        "text": 4
+        'type': 'label',
+        'text': 4
       }, {
-        "type": "label",
-        "text": 5
+        'type': 'label',
+        'text': 5
       }]
     }
-    compare(actual, expected);
-  });
-  it('item + item', function() { 
+    compare(actual, expected)
+  })
+  it('item + item', function () {
     var data = {
-      numbers: [1,2,3,4,5]
-    };
+      numbers: [1, 2, 3, 4, 5]
+    }
     var template = {
-      "items": {
-        "{{#concat}}": [
+      'items': {
+        '{{#concat}}': [
           {
-            "type": "label",
-            "text": "header"
+            'type': 'label',
+            'text': 'header'
           },
           {
-            "type": "label",
-            "text": "{{numbers.toString()}}"
+            'type': 'label',
+            'text': '{{numbers.toString()}}'
           }
         ]
       }
-    };
-    var actual = st.TRANSFORM.transform(template, data);
+    }
+    var actual = st.TRANSFORM.transform(template, data)
     var expected = {
       items: [{
-        "type": "label",
-        "text": "header"
+        'type': 'label',
+        'text': 'header'
       }, {
-        "type": "label",
-        "text": "1,2,3,4,5"
+        'type': 'label',
+        'text': '1,2,3,4,5'
       }]
     }
-    compare(actual, expected);
-  });
-  it('array + item', function() { 
+    compare(actual, expected)
+  })
+  it('array + item', function () {
     var data = {
-      numbers: [1,2,3,4,5]
-    };
+      numbers: [1, 2, 3, 4, 5]
+    }
     var template = {
-      "items": {
-        "{{#concat}}": [
+      'items': {
+        '{{#concat}}': [
           {
-            "{{#each numbers}}": {
-              "type": "label",
-              "text": "{{this}}"
+            '{{#each numbers}}': {
+              'type': 'label',
+              'text': '{{this}}'
             }
           },
           {
-            "type": "label",
-            "text": "header"
+            'type': 'label',
+            'text': 'header'
           }
         ]
       }
-    };
-    var actual = st.TRANSFORM.transform(template, data);
+    }
+    var actual = st.TRANSFORM.transform(template, data)
     var expected = {
       items: [{
-        "type": "label",
-        "text": 1
+        'type': 'label',
+        'text': 1
       }, {
-        "type": "label",
-        "text": 2
+        'type': 'label',
+        'text': 2
       }, {
-        "type": "label",
-        "text": 3
+        'type': 'label',
+        'text': 3
       }, {
-        "type": "label",
-        "text": 4
+        'type': 'label',
+        'text': 4
       }, {
-        "type": "label",
-        "text": 5
+        'type': 'label',
+        'text': 5
       }, {
-        "type": "label",
-        "text": "header"
+        'type': 'label',
+        'text': 'header'
       }]
     }
-    compare(actual, expected);
-  });
-  it('array + array', function() { 
+    compare(actual, expected)
+  })
+  it('array + array', function () {
     var data = {
-      numbers: [1,2,3,4,5]
-    };
-    var template = {
-      "items": {
-        "{{#concat}}": [
-          {
-            "{{#each numbers}}": {
-              "type": "label",
-              "text": "{{this}}"
-            }
-          },
-          {
-            "{{#each numbers}}": {
-              "type": "label",
-              "text": "{{this}}"
-            }
-          }
-        ]
-      }
-    };
-    var actual = st.TRANSFORM.transform(template, data);
-    var expected = {
-      items: [{
-        "type": "label",
-        "text": 1
-      }, {
-        "type": "label",
-        "text": 2
-      }, {
-        "type": "label",
-        "text": 3
-      }, {
-        "type": "label",
-        "text": 4
-      }, {
-        "type": "label",
-        "text": 5
-      }, {
-        "type": "label",
-        "text": 1
-      }, {
-        "type": "label",
-        "text": 2
-      }, {
-        "type": "label",
-        "text": 3
-      }, {
-        "type": "label",
-        "text": 4
-      }, {
-        "type": "label",
-        "text": 5
-      }]
+      numbers: [1, 2, 3, 4, 5]
     }
-    compare(actual, expected);
-  });
-  it('array + item + array', function() { 
-    var data = {
-      numbers: [1,2,3,4,5]
-    };
     var template = {
-      "items": {
-        "{{#concat}}": [
+      'items': {
+        '{{#concat}}': [
           {
-            "{{#each numbers}}": {
-              "type": "label",
-              "text": "{{this}}"
+            '{{#each numbers}}': {
+              'type': 'label',
+              'text': '{{this}}'
             }
           },
           {
-            "numbers": "{{numbers.toString()}}"
-          },
-          {
-            "{{#each numbers}}": {
-              "type": "label",
-              "text": "{{this}}"
+            '{{#each numbers}}': {
+              'type': 'label',
+              'text': '{{this}}'
             }
           }
         ]
       }
-    };
-    var actual = st.TRANSFORM.transform(template, data);
+    }
+    var actual = st.TRANSFORM.transform(template, data)
     var expected = {
       items: [{
-        "type": "label",
-        "text": 1
+        'type': 'label',
+        'text': 1
       }, {
-        "type": "label",
-        "text": 2
+        'type': 'label',
+        'text': 2
       }, {
-        "type": "label",
-        "text": 3
+        'type': 'label',
+        'text': 3
       }, {
-        "type": "label",
-        "text": 4
+        'type': 'label',
+        'text': 4
       }, {
-        "type": "label",
-        "text": 5
+        'type': 'label',
+        'text': 5
       }, {
-        "numbers": "1,2,3,4,5"
+        'type': 'label',
+        'text': 1
       }, {
-        "type": "label",
-        "text": 1
+        'type': 'label',
+        'text': 2
       }, {
-        "type": "label",
-        "text": 2
+        'type': 'label',
+        'text': 3
       }, {
-        "type": "label",
-        "text": 3
+        'type': 'label',
+        'text': 4
       }, {
-        "type": "label",
-        "text": 4
-      }, {
-        "type": "label",
-        "text": 5
+        'type': 'label',
+        'text': 5
       }]
     }
-    compare(actual, expected);
-  });
-});
+    compare(actual, expected)
+  })
+  it('array + item + array', function () {
+    var data = {
+      numbers: [1, 2, 3, 4, 5]
+    }
+    var template = {
+      'items': {
+        '{{#concat}}': [
+          {
+            '{{#each numbers}}': {
+              'type': 'label',
+              'text': '{{this}}'
+            }
+          },
+          {
+            'numbers': '{{numbers.toString()}}'
+          },
+          {
+            '{{#each numbers}}': {
+              'type': 'label',
+              'text': '{{this}}'
+            }
+          }
+        ]
+      }
+    }
+    var actual = st.TRANSFORM.transform(template, data)
+    var expected = {
+      items: [{
+        'type': 'label',
+        'text': 1
+      }, {
+        'type': 'label',
+        'text': 2
+      }, {
+        'type': 'label',
+        'text': 3
+      }, {
+        'type': 'label',
+        'text': 4
+      }, {
+        'type': 'label',
+        'text': 5
+      }, {
+        'numbers': '1,2,3,4,5'
+      }, {
+        'type': 'label',
+        'text': 1
+      }, {
+        'type': 'label',
+        'text': 2
+      }, {
+        'type': 'label',
+        'text': 3
+      }, {
+        'type': 'label',
+        'text': 4
+      }, {
+        'type': 'label',
+        'text': 5
+      }]
+    }
+    compare(actual, expected)
+  })
+})
